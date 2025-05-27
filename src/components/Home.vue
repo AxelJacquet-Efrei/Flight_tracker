@@ -113,7 +113,6 @@ onMounted(async () => {
     const { data } = await supabase.auth.getUser()
     user.value = data.user
     
-    // Auto-redirect authenticated users to calculator
     if (user.value) {
       router.push('/calculator')
     }
@@ -123,7 +122,6 @@ onMounted(async () => {
     loading.value = false
   }
   
-  // Listen for auth changes
   supabase.auth.onAuthStateChange((_event, session) => {
     user.value = session?.user ?? null
     if (session?.user) {

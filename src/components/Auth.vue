@@ -81,9 +81,6 @@ const signInWithProvider = async (provider) => {
       throw authError
     }
     
-    // The user will be redirected to the OAuth provider
-    // No need to handle success here as it will redirect
-    
   } catch (err) {
     console.error('Auth error:', err)
     error.value = err.message || 'An error occurred during authentication'

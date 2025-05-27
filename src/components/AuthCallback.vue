@@ -19,7 +19,6 @@
   
   onMounted(async () => {
     try {
-      // Handle the OAuth callback
       const { data, error } = await supabase.auth.getSession()
       
       if (error) {
@@ -29,10 +28,8 @@
       }
       
       if (data.session) {
-        // User is authenticated, redirect to dashboard/calculator
         router.push('/calculator')
       } else {
-        // No session, redirect back to auth
         router.push('/auth')
       }
     } catch (err) {

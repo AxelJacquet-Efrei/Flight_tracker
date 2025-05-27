@@ -72,7 +72,7 @@
   })
   
   async function onSubmit() {
-    Object.keys(errors).forEach(key => errors[key] = '') // reset
+    Object.keys(errors).forEach(key => errors[key] = '')
     const result = schema.safeParse(form)
     if (!result.success) {
       result.error.errors.forEach(err => {

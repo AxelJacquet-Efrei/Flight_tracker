@@ -54,10 +54,7 @@
   import { reactive, ref } from 'vue'
   import { z } from 'zod'
   
-  // Remplace ceci par ton vrai import
-  // import { calculateFlightEmissions } from '@/lib/emissions'
   const calculateFlightEmissions = async (data) => {
-    // Simule un appel asynchrone
     return new Promise((resolve) => setTimeout(() => resolve({ emissions: 123, ...data }), 1000))
   }
   
@@ -87,7 +84,7 @@
   })
   
   async function onSubmit() {
-    Object.keys(errors).forEach(key => errors[key] = '') // reset
+    Object.keys(errors).forEach(key => errors[key] = '')
     const result = schema.safeParse(form)
     if (!result.success) {
       result.error.errors.forEach(err => {

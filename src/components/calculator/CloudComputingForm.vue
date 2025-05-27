@@ -150,24 +150,20 @@ async function onSubmit() {
   
   loading.value = true
   try {
-    // Simulate API call delay
     await new Promise(resolve => setTimeout(resolve, 1500))
     
-    // Calculate emissions based on usage
     const baseEmission = (form.cpu_hours * 0.5) + (form.memory_gb * 0.2) + (form.storage_gb * 0.1)
     
-    // Provider multipliers
     const providerMultipliers = {
       aws: 1.0,
-      gcp: 0.8, // Google uses more renewable energy
+      gcp: 0.8,
       azure: 0.9
     }
     
-    // Region multipliers (based on energy grid)
     const regionMultipliers = {
       'us-east-1': 1.2,
       'us-west-1': 0.9,
-      'eu-west-1': 0.7, // EU has greener energy
+      'eu-west-1': 0.7,
       'ap-southeast-1': 1.1
     }
     
@@ -175,7 +171,6 @@ async function onSubmit() {
       providerMultipliers[form.provider] * 
       regionMultipliers[form.region]
     
-    // Create result object that matches EmissionResult expectations
     const result = {
       activity_type: 'cloud_computing',
       co2e_kg: finalEmission,

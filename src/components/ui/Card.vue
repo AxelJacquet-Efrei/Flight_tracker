@@ -13,7 +13,6 @@
   const cardRef = ref(null)
   const attrs = useAttrs()
   
-  // Retire 'class' des attributs pour éviter de la doubler
   const attrsWithoutClass = computed(() => {
     const { class: _class, ...rest } = attrs
     return rest

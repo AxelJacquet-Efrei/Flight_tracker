@@ -173,8 +173,7 @@
   const loading = ref(true)
   const mobileMenuOpen = ref(false)
   const showUserMenu = ref(false)
-  
-  // Helper functions
+
   const getUserName = (user) => {
     return user?.user_metadata?.full_name || 
            user?.user_metadata?.name || 
@@ -207,7 +206,6 @@
     }
   }
   
-  // Close mobile menu on route change
   const closeMenus = () => {
     mobileMenuOpen.value = false
     showUserMenu.value = false
@@ -223,19 +221,16 @@
       loading.value = false
     }
     
-    // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       user.value = session?.user ?? null
       loading.value = false
     })
   
-    // Cleanup subscription on unmount
     onUnmounted(() => {
       subscription?.unsubscribe()
     })
   })
   
-  // Close menus when clicking outside or on route change
   router.afterEach(closeMenus)
   </script>
   

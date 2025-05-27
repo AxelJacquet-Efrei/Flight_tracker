@@ -130,18 +130,14 @@
   <script setup>
   import { ref, computed } from "vue"
   
-  // Props
   const props = defineProps({
     emission: { type: Object, required: true }
   })
-  
-  // --- AUTH & TOAST MOCKS ---
-  // Simule une auth utilisateur, tu peux remplacer par ta vraie logique
-  const isAuthenticated = ref(true) // ou false pour tester
+
+  const isAuthenticated = ref(true)
   const toastMsg = ref("")
-  const toastVariant = ref("success") // ou "error"
-  
-  // --- FAVORITE LOGIC ---
+  const toastVariant = ref("success")
+
   const favoriteName = ref("")
   const isSaving = ref(false)
   
@@ -162,7 +158,6 @@
     }
     isSaving.value = true
     try {
-      // Simule une requête de sauvegarde
       await new Promise(resolve => setTimeout(resolve, 1200))
       showToast("Saved to favorites", "success")
       favoriteName.value = ""
@@ -172,8 +167,7 @@
       isSaving.value = false
     }
   }
-  
-  // --- FORMATTING & IMPACT LOGIC ---
+
   function formatActivityType(type) {
     return type
       .split("_")
