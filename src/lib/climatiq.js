@@ -526,3 +526,75 @@ export async function calculateFuelEmissions(
   }
   return response.json();
 }
+
+
+/**
+ * Récupère les régions disponibles pour un fournisseur cloud donné.
+ *
+ * @param {string} provider Nom du fournisseur (aws, gcp, azure).
+ * @returns {Promise<Array>} Liste des régions disponibles.
+ * @throws {Error} En cas d'erreur HTTP ou de requête.
+ */
+export async function getCloudRegions(provider) {
+  try {
+    const response = await fetch(`${BASE_URL}/compute/v1/${provider}/regions`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`HTTP ${response.status} – ${errBody}`);
+    }
+
+    const data = await response.json();
+    return data.regions || [];
+  } catch (error) {
+    console.warn(`Impossible de récupérer les régions pour ${provider}:`, error);
+    // Fallback avec des régions statiques en cas d'erreur
+    return getStaticRegions(provider);
+  }
+}
+
+/**
+ * Régions statiques de fallback si l'API ne répond pas.
+ *
+ * @param {string} provider Nom du fournisseur.
+ * @returns {Array} Liste des régions par défaut.
+ */
+function getStaticRegions(provider) {
+  const staticRegions = {
+    aws: [
+      { id: 'us-east-1', name: 'US East (N. Virginia)' },
+      { id: 'us-west-1', name: 'US West (N. California)' },
+      { id: 'us-west-2', name: 'US West (Oregon)' },
+      { id: 'eu-west-1', name: 'EU (Ireland)' },
+      { id: 'eu-central-1', name: 'EU (Frankfurt)' },
+      { id: 'ap-southeast-1', name: 'Asia Pacific (Singapore)' },
+      { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' }
+    ],
+    gcp: [
+      { id: 'us-central1', name: 'US Central (Iowa)' },
+      { id: 'us-east1', name: 'US East (South Carolina)' },
+      { id: 'us-west1', name: 'US West (Oregon)' },
+      { id: 'europe-west1', name: 'Europe West (Belgium)' },
+      { id: 'europe-west4', name: 'Europe West (Netherlands)' },
+      { id: 'asia-southeast1', name: 'Asia Southeast (Singapore)' },
+      { id: 'asia-east1', name: 'Asia East (Taiwan)' }
+    ],
+    azure: [
+      { id: 'eastus', name: 'East US (Virginia)' },
+      { id: 'westus', name: 'West US (California)' },
+      { id: 'westus2', name: 'West US 2 (Washington)' },
+      { id: 'westeurope', name: 'West Europe (Netherlands)' },
+      { id: 'northeurope', name: 'North Europe (Ireland)' },
+      { id: 'southeastasia', name: 'Southeast Asia (Singapore)' },
+      { id: 'eastasia', name: 'East Asia (Hong Kong)' }
+    ]
+  };
+
+  return staticRegions[provider] || [];
+}
