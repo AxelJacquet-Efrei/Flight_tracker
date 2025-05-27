@@ -1,6 +1,7 @@
 <script setup>
 import { supabase } from './lib/supabase'
 import { ref, onMounted } from 'vue'
+import Header from './components/Header.vue'
 
 const user = ref(null)
 
@@ -15,7 +16,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <router-view />
+  <div class="min-h-screen bg-background">
+    <Header />
+    <main class="container mx-auto px-4 py-8">
+      <router-view />
+    </main>
+  </div>
 </template>
 
 <style scoped>

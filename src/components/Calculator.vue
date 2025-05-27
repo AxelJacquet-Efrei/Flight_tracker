@@ -60,6 +60,7 @@
               <span class="hidden sm:inline">Custom</span>
             </TabsTrigger>
           </TabsList>
+
           <Card class="eco-card border-green-200">
             <CardContent class="pt-6">
               <TabsContent value="cloud" :modelValue="activeTab">
@@ -128,10 +129,10 @@
   import TabsContent from './ui/TabsContent.vue'
   import Card from './ui/Card.vue'
   import CardContent from './ui/CardContent.vue'
-//   import CloudComputingForm from './calculator/CloudComputingForm.vue'
-//   import FlightForm from './calculator/FlightForm.vue'
-//   import CustomActivityForm from './calculator/CustomActivityForm.vue'
-//   import EmissionResult from './calculator/EmissionResult.vue'
+  import CloudComputingForm from './calculator/CloudComputingForm.vue'
+  import FlightForm from './calculator/FlightForm.vue'
+  import CustomActivityForm from './calculator/CustomActivityForm.vue'
+  import EmissionResult from './calculator/EmissionResult.vue'
   
   const result = ref(null)
   const activeTab = ref('cloud')
