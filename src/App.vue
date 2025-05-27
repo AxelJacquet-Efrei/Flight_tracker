@@ -1,17 +1,21 @@
 <script setup>
-import HelloWorld from './components/HelloWorld.vue'
+import { supabase } from './lib/supabase'
+import { ref, onMounted } from 'vue'
+
+const user = ref(null)
+
+onMounted(() => {
+  supabase.auth.getUser().then(({ data }) => {
+    user.value = data.user
+  })
+  supabase.auth.onAuthStateChange((_event, session) => {
+    user.value = session?.user ?? null
+  })
+})
 </script>
 
 <template>
-  <div>
-    <a href="https://vite.dev" target="_blank">
-      <img src="/vite.svg" class="logo" alt="Vite logo" />
-    </a>
-    <a href="https://vuejs.org/" target="_blank">
-      <img src="./assets/vue.svg" class="logo vue" alt="Vue logo" />
-    </a>
-  </div>
-  <HelloWorld msg="Vite + Vue" />
+  <router-view />
 </template>
 
 <style scoped>
