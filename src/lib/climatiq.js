@@ -353,3 +353,176 @@ export async function calculateMemoryEmissions(
     throw error;
   }
 }
+
+
+// Recherche de facteurs d’émission
+export async function searchEmissionFactors(query, filters = {}) {
+  const params = new URLSearchParams({ query, ...filters });
+  const response = await fetch(`${BASE_URL}/data/v1/search?${params.toString()}`, {
+    headers: { 'Authorization': `Bearer ${CLIMATIQ_API_KEY}` },
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+// Récupère un facteur d’émission par son ID
+export async function getEmissionFactorById(id) {
+  const response = await fetch(`${BASE_URL}/data/v1/emission-factors/${id}`, {
+    headers: { 'Authorization': `Bearer ${CLIMATIQ_API_KEY}` },
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+// Calcul générique pour activité personnalisée
+export async function calculateCustomEmissions(activityId, parameters, dataVersion = 'latest') {
+  const response = await fetch(`${BASE_URL}/data/v1/estimate`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      emission_factor: { activity_id: activityId, data_version: dataVersion },
+      parameters
+    }),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+// Batch estimate
+export async function calculateBatchEmissions(requests) {
+  const response = await fetch(`${BASE_URL}/data/v1/estimate/batch`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ requests }),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+// Cloud: instance mixte (embodied + runtime)
+export async function calculateInstanceEmissions(
+  provider, instanceType, region, duration,
+  averageVcpuUtilization = 0.5, year
+) {
+  const apiRegion = normalizeRegion(region);
+  const payload = {
+    instance_type: instanceType,
+    region: apiRegion,
+    duration,
+    duration_unit: 'hour',
+    average_vcpu_utilization: averageVcpuUtilization,
+    ...(year && { year })
+  };
+  const response = await fetch(`${BASE_URL}/compute/v1/${provider}/instance`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+// Energy (Scope 1 & 2)
+/**
+ * Calcule les émissions liées à la consommation électrique.
+ * @param {number} consumption Quantité consommée.
+ * @param {string} consumptionUnit Unité (kWh).
+ * @param {string} [country] Code pays ISO.
+ * @param {string} [region] Région interne.
+ * @param {number} [year]
+ */
+export async function calculateElectricityEmissions(
+  consumption, consumptionUnit, country, region, year
+) {
+  const payload = { consumption, consumption_unit: consumptionUnit };
+  if (country) payload.country = country;
+  if (region)  payload.region  = region;
+  if (year)    payload.year    = year;
+  const response = await fetch(`${BASE_URL}/energy/v1/electricity`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+/**
+ * Calcule les émissions liées à la consommation de chaleur.
+ */
+export async function calculateHeatEmissions(
+  consumption, consumptionUnit, country, region, year
+) {
+  const payload = { consumption, consumption_unit: consumptionUnit };
+  if (country) payload.country = country;
+  if (region)  payload.region  = region;
+  if (year)    payload.year    = year;
+  const response = await fetch(`${BASE_URL}/energy/v1/heat`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
+
+/**
+ * Calcule les émissions liées à la consommation de carburant.
+ */
+export async function calculateFuelEmissions(
+  consumption, consumptionUnit, country, region, year
+) {
+  const payload = { consumption, consumption_unit: consumptionUnit };
+  if (country) payload.country = country;
+  if (region)  payload.region  = region;
+  if (year)    payload.year    = year;
+  const response = await fetch(`${BASE_URL}/energy/v1/fuel`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errBody = await response.text();
+    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  }
+  return response.json();
+}
