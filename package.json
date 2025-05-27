@@ -10,15 +10,16 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
+    "dotenv": "^16.5.0",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4",
     "zod": "^3.25.30"
   },
   "devDependencies": {
-    "@vitejs/plugin-vue": "^4.3.4",
+    "@vitejs/plugin-vue": "^5.2.4",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
-    "vite": "^4.4.9"
+    "vite": "^6.3.5"
   }
 }
