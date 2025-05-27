@@ -1,6 +1,3 @@
-// src/lib/climatiq.js
-
-// 1) Récupération de la clé API (Vite ou Node)
 /**
  * Clé API pour accéder aux endpoints Climatiq.
  * Je la récupère depuis les variables d'environnement VITE ou Node.
@@ -29,11 +26,10 @@ const BASE_URL = 'https://api.climatiq.io';
  */
 function normalizeRegion(region) {
   return region
-    .replace(/-/g, '_')                   // je transforme les tirets en underscores
-    .replace(/([A-Za-z])(\d+)$/, '$1_$2'); // j’ajoute un underscore avant les chiffres finaux
+    .replace(/-/g, '_')                   
+    .replace(/([A-Za-z])(\d+)$/, '$1_$2');
 }
 
-// 2) Vols (travel/flights)
 /**
  * Calcule les émissions carbone d’un vol.
  *
@@ -73,9 +69,6 @@ export async function calculateFlightEmissions(
   }
 }
 
-
-
-// 6) Cloud Computing – CPU (compute/v1/:provider/cpu)
 /**
  * Calcule les émissions carbone liées à l’utilisation de CPU dans le cloud.
  *
@@ -97,14 +90,14 @@ export async function calculateCpuEmissions(
   year
 ) {
   try {
-    const apiRegion = normalizeRegion(region); // j’applique la normalisation
+    const apiRegion = normalizeRegion(region);
     const body = {
       region: apiRegion,
       cpu_count: cpuCount,
       average_vcpu_utilization: averageVcpuUtilization,
       duration,
       duration_unit: "hour",
-      ...(year !== undefined && { year }), // j’ajoute l’année si précisée
+      ...(year !== undefined && { year }),
     };
     const response = await fetch(`${BASE_URL}/compute/v1/${provider}/cpu`, {
       method: 'POST',
@@ -126,7 +119,6 @@ export async function calculateCpuEmissions(
   }
 }
 
-// 7) Cloud Computing – Storage (compute/v1/:provider/storage)
 /**
  * Calcule les émissions carbone liées au stockage dans le cloud.
  *
@@ -182,7 +174,6 @@ export async function calculateStorageEmissions(
   }
 }
 
-// 8) Cloud Computing – Memory (compute/v1/:provider/memory)
 /**
  * Calcule les émissions carbone liées à l’utilisation de mémoire dans le cloud.
  *
@@ -235,53 +226,98 @@ export async function calculateMemoryEmissions(
   }
 }
 
-
-// Recherche de facteurs d’émission
 export async function searchEmissionFactors(query, filters = {}) {
-  const params = new URLSearchParams({ query, ...filters });
-  const response = await fetch(`${BASE_URL}/data/v1/search?${params.toString()}`, {
-    headers: { 'Authorization': `Bearer ${CLIMATIQ_API_KEY}` },
-  });
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  try {
+    const params = new URLSearchParams();
+    params.append('query', query);
+    
+    if (filters.limit) {
+      params.append('results_per_page', filters.limit);
+      delete filters.limit;
+    }
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        params.append(key, value);
+      }
+    });
+    
+    const response = await fetch(`${BASE_URL}/data/v1/search?${params.toString()}`, {
+      method: 'GET',
+      headers: { 
+        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+    });
+    
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`HTTP ${response.status} – ${errBody}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Search emission factors error:', error);
+    throw error;
   }
-  return response.json();
 }
 
-// Récupère un facteur d’émission par son ID
 export async function getEmissionFactorById(id) {
-  const response = await fetch(`${BASE_URL}/data/v1/emission-factors/${id}`, {
-    headers: { 'Authorization': `Bearer ${CLIMATIQ_API_KEY}` },
-  });
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`HTTP ${response.status} – ${errBody}`);
+  try {
+    const response = await fetch(`${BASE_URL}/data/v1/emission-factors/${id}`, {
+      headers: { 
+        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+    });
+    
+    if (!response.ok) {
+      const errBody = await response.text();
+      throw new Error(`HTTP ${response.status} – ${errBody}`);
+    }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error getting emission factor by ID:', error);
+    throw error;
   }
-  return response.json();
 }
 
-// Calcul générique pour activité personnalisée
 export async function calculateCustomEmissions(activityId, parameters, dataVersion = 'latest') {
-  const response = await fetch(`${BASE_URL}/data/v1/estimate`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      emission_factor: { activity_id: activityId, data_version: dataVersion },
+  try {
+    const body = {
+      emission_factor: { 
+        activity_id: activityId, 
+        data_version: dataVersion 
+      },
       parameters
-    }),
-  });
-  if (!response.ok) {
-    const errBody = await response.text();
-    throw new Error(`HTTP ${response.status} – ${errBody}`);
+    };
+    
+    console.log('Sending to Climatiq estimate API:', JSON.stringify(body, null, 2));
+    
+    const response = await fetch(`${BASE_URL}/data/v1/estimate`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body),
+    });
+    
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error('Climatiq API Error:', errBody);
+      throw new Error(`HTTP ${response.status} – ${errBody}`);
+    }
+    
+    const result = await response.json();
+    console.log('Climatiq API Response:', result);
+    return result;
+  } catch (error) {
+    console.error('Error in calculateCustomEmissions:', error);
+    throw error;
   }
-  return response.json();
 }
-
-
 
 /**
  * Récupère les régions disponibles pour un fournisseur cloud donné.
@@ -309,7 +345,6 @@ export async function getCloudRegions(provider) {
     return data.regions || [];
   } catch (error) {
     console.warn(`Impossible de récupérer les régions pour ${provider}:`, error);
-    // Fallback avec des régions statiques en cas d'erreur
     return getStaticRegions(provider);
   }
 }

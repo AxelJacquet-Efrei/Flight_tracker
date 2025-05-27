@@ -10,7 +10,6 @@ import {
   calculateCustomEmissions
 } from '../lib/climatiq.js';
 
-// Vérification de la clé API
 if (!process.env.VITE_CLIMATIQ_API_KEY) {
   console.error('VITE_CLIMATIQ_API_KEY non définie. Veuillez configurer votre .env');
   process.exit(1);
@@ -43,7 +42,6 @@ async function runErrorTest(name, fn, expectedMessagePart) {
 }
 
 (async () => {
-  // Tests valides
   await runTest('Vol CDG->MRS',
     () => calculateFlightEmissions('CDG', 'MRS'),
     res => {
@@ -73,7 +71,6 @@ async function runErrorTest(name, fn, expectedMessagePart) {
     }
   );
 
-  // Tests d'erreur attendus
   await runErrorTest('Recherche facteur car (missing data_version)',
     () => searchEmissionFactors('car'),
     'missing field'
@@ -89,7 +86,6 @@ async function runErrorTest(name, fn, expectedMessagePart) {
     'not recognized'
   );
 
-  // Tests d'erreur existants
   await runErrorTest('Vol codes invalides',
     () => calculateFlightEmissions('XXX', 'YYY'),
     'HTTP'

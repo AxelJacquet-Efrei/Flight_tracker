@@ -4,6 +4,9 @@
       <div class="mb-6 text-center">
         <h2 class="text-2xl font-bold mb-2">Sign In</h2>
         <p class="text-muted-foreground">Sign in to calculate and track your carbon emissions</p>
+        <div v-if="redirectRoute" class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded text-blue-700 text-sm">
+          You need to sign in to access this page
+        </div>
       </div>
       
       <!-- Error message -->
@@ -48,28 +51,75 @@
           <span>Sign in with Microsoft</span>
         </button>
       </div>
+      
+      <!-- Back to home link -->
+      <div class="mt-6 text-center">
+        <router-link 
+          to="/" 
+          class="text-sm text-green-600 hover:text-green-700 hover:underline"
+        >
+          ← Back to Home
+        </router-link>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { supabase } from '../lib/supabase'
 
 const router = useRouter()
+const route = useRoute()
 const loading = ref(false)
 const error = ref('')
+const redirectRoute = ref('')
+
+onMounted(() => {
+  // Récupérer la route de redirection depuis les paramètres de l'URL
+  redirectRoute.value = route.query.redirect || ''
+  
+  // Vérifier si l'utilisateur est déjà connecté
+  checkCurrentUser()
+  
+  // Écouter les changements d'état d'authentification
+  supabase.auth.onAuthStateChange((_event, session) => {
+    if (session?.user) {
+      // Utilisateur connecté, rediriger
+      const targetRoute = redirectRoute.value || '/calculator'
+      router.push(targetRoute)
+    }
+  })
+})
+
+async function checkCurrentUser() {
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      // Utilisateur déjà connecté, rediriger immédiatement
+      const targetRoute = redirectRoute.value || '/calculator'
+      router.push(targetRoute)
+    }
+  } catch (err) {
+    console.error('Erreur lors de la vérification de l\'utilisateur:', err)
+  }
+}
 
 const signInWithProvider = async (provider) => {
   try {
     loading.value = true
     error.value = ''
     
+    // Construire l'URL de redirection avec la route de destination
+    const redirectTo = redirectRoute.value 
+      ? `${window.location.origin}/auth/callback?redirect=${encodeURIComponent(redirectRoute.value)}`
+      : `${window.location.origin}/auth/callback`
+    
     const { data, error: authError } = await supabase.auth.signInWithOAuth({
       provider,
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo,
         queryParams: {
           access_type: 'offline',
           prompt: 'consent',

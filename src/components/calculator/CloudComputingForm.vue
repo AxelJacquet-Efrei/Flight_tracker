@@ -246,7 +246,6 @@ async function onSubmit() {
   
   try {
     const [cpuResult, memoryResult, storageResult] = await Promise.all([
-      // CPU emissions
       calculateCpuEmissions(
         form.provider,
         form.region,
@@ -278,7 +277,6 @@ async function onSubmit() {
       )
     ])
 
-    // Somme des émissions
     const totalEmissions = 
       cpuResult.co2e + 
       memoryResult.co2e + 

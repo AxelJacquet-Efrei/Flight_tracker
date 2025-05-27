@@ -12,10 +12,11 @@
   
   <script setup>
   import { onMounted } from 'vue'
-  import { useRouter } from 'vue-router'
+  import { useRouter, useRoute } from 'vue-router'
   import { supabase } from '../lib/supabase'
   
   const router = useRouter()
+  const route = useRoute()
   
   onMounted(async () => {
     try {
@@ -28,7 +29,9 @@
       }
       
       if (data.session) {
-        router.push('/calculator')
+        // Récupérer la route de redirection depuis les paramètres de l'URL
+        const redirectTo = route.query.redirect || '/calculator'
+        router.push(redirectTo)
       } else {
         router.push('/auth')
       }
@@ -38,3 +41,4 @@
     }
   })
   </script>
+  
