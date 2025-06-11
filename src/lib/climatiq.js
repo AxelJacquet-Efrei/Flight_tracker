@@ -1,9 +1,8 @@
 /**
- * Clé API pour accéder aux endpoints Climatiq.
- * Je la récupère depuis les variables d'environnement VITE ou Node.
- * @type {string}
- * @throws {Error} Si la variable d'environnement VITE_CLIMATIQ_API_KEY n’est pas définie.
+ * @file climatiqApi.js
+ * Wrapper API Climatiq avec gestion centralisée des erreurs
  */
+
 const CLIMATIQ_API_KEY =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_CLIMATIQ_API_KEY)
     ? import.meta.env.VITE_CLIMATIQ_API_KEY
@@ -13,74 +12,116 @@ if (!CLIMATIQ_API_KEY) {
   throw new Error('La variable VITE_CLIMATIQ_API_KEY n’est pas définie');
 }
 
-/** URL de base pour toutes les requêtes Climatiq */
 const BASE_URL = 'https://api.climatiq.io';
 
 /**
- * Utilitaire : normalise le nom de région pour l’API.
- * - Remplace les tirets par des underscores.
- * - Insère un underscore avant la partie numérique finale.
- *
- * @param {string} region Nom de la région au format "us-west-2" ou similaire.
- * @returns {string} Région formatée pour l’API (ex. "us_west_2").
+ * Classe d’erreur pour uniformiser les retours et messages à afficher
  */
-function normalizeRegion(region) {
-  return region
-    .replace(/-/g, '_')                   
-    .replace(/([A-Za-z])(\d+)$/, '$1_$2');
+export class ApiError extends Error {
+  constructor(message, status = 0, details = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
 }
 
 /**
- * Calcule les émissions carbone d’un vol.
- *
- * @param {string} origin Code IATA de l’aéroport de départ.
- * @param {string} destination Code IATA de l’aéroport d’arrivée.
- * @param {number} [passengers=1] Nombre de passagers.
- * @param {string} [travelClass='economy'] Classe de voyage (economy, business, etc.).
- * @returns {Promise<object>} Réponse JSON de l’API contenant les émissions.
- * @throws {Error} En cas d’erreur HTTP ou de requête.
+ * Wrapper fetch + gestion des erreurs HTTP & parsing JSON
+ * @param {string} url
+ * @param {RequestInit} options
+ * @returns {Promise<any>}
+ * @throws {ApiError}
  */
+async function fetchWithError(url, options) {
+  let res;
+  try {
+    res = await fetch(url, options);
+  } catch (netErr) {
+    throw new ApiError(
+      'Impossible de contacter le serveur. Vérifiez votre connexion.',
+      0,
+      netErr
+    );
+  }
+
+  const contentType = res.headers.get('Content-Type') || '';
+  let textBody = '';
+  try {
+    textBody = await res.text();
+  } catch {}
+
+  if (!res.ok) {
+    let detail = textBody;
+    if (contentType.includes('application/json')) {
+      try {
+        const jsonErr = JSON.parse(textBody);
+        detail = jsonErr.detail || jsonErr.message || JSON.stringify(jsonErr);
+      } catch {}
+    }
+
+    let userMsg;
+    switch (res.status) {
+      case 400:
+        userMsg = 'Requête invalide. Vérifiez les paramètres.';
+        break;
+      case 401:
+        userMsg = 'Clé API invalide ou expirée.';
+        break;
+      case 403:
+        userMsg = 'Accès refusé.';
+        break;
+      case 404:
+        userMsg = 'Ressource introuvable.';
+        break;
+      case 429:
+        userMsg = 'Trop de requêtes. Réessayez plus tard.';
+        break;
+      default:
+        userMsg = 'Erreur serveur. Veuillez réessayer ultérieurement.';
+    }
+
+    throw new ApiError(userMsg, res.status, detail);
+  }
+
+  if (contentType.includes('application/json')) {
+    try {
+      return JSON.parse(textBody);
+    } catch {
+      throw new ApiError('Réponse inattendue du serveur.', res.status, textBody);
+    }
+  }
+
+  return textBody;
+}
+
+/**
+ * Normalise un nom de région cloud (ex. "us-west-2" → "us_west_2")
+ */
+function normalizeRegion(region) {
+  return region.replace(/-/g, '_').replace(/([A-Za-z])(\d+)$/, '$1_$2');
+}
+
+/** Calcule les émissions carbone d’un vol */
 export async function calculateFlightEmissions(
   origin,
   destination,
   passengers = 1,
   travelClass = 'economy'
 ) {
-  try {
-    const response = await fetch(`${BASE_URL}/travel/flights`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        legs: [{ from: origin, to: destination, passengers, class: travelClass }],
-      }),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-   throw error;
-  }
+  const url = `${BASE_URL}/travel/flights`;
+  const body = { legs: [{ from: origin, to: destination, passengers, class: travelClass }] };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 }
 
-/**
- * Calcule les émissions carbone liées à l’utilisation de CPU dans le cloud.
- *
- * @param {string} provider Nom du fournisseur (aws, gcp, azure, etc.).
- * @param {string} region Région cloud (ex. "eu-west-1").
- * @param {number} cpuCount Nombre de vCPU utilisées.
- * @param {number} duration Durée de l’utilisation.
- * @param {number} [averageVcpuUtilization=0.5] Taux moyen d’utilisation du vCPU (0 à 1).
- * @param {number} [year] Année à prendre en compte pour le calcul (ex. 2024).
- * @returns {Promise<object>} Réponse JSON de l’API contenant les émissions.
- * @throws {Error} En cas d’erreur HTTP ou de requête.
- */
+/** Calcule les émissions liées au CPU dans le cloud */
 export async function calculateCpuEmissions(
   provider,
   region,
@@ -89,272 +130,203 @@ export async function calculateCpuEmissions(
   averageVcpuUtilization = 0.5,
   year
 ) {
-  try {
-    const apiRegion = normalizeRegion(region);
-    const body = {
-      region: apiRegion,
-      cpu_count: cpuCount,
-      average_vcpu_utilization: averageVcpuUtilization,
-      duration,
-      duration_unit: "hour",
-      ...(year !== undefined && { year }),
-    };
-    const response = await fetch(`${BASE_URL}/compute/v1/${provider}/cpu`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
+  const apiRegion = normalizeRegion(region);
+  const url = `${BASE_URL}/compute/v1/${provider}/cpu`;
+  const body = {
+    region: apiRegion,
+    cpu_count: cpuCount,
+    average_vcpu_utilization: averageVcpuUtilization,
+    duration,
+    duration_unit: 'hour',
+    ...(year !== undefined && { year }),
+  };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 }
 
-/**
- * Calcule les émissions carbone liées au stockage dans le cloud.
- *
- * @param {string} provider Nom du fournisseur (aws, gcp, azure, etc.).
- * @param {string} region Région cloud (ex. "us-east-1").
- * @param {string} storageType Type de stockage (ssd, hdd, etc.).
- * @param {number} data Quantité de données stockées.
- * @param {number} duration Durée du stockage.
- * @param {string} [dataUnit="MB"] Unité des données (MB, GB, etc.).
- * @param {string} [durationUnit="hour"] Unité de durée (hour, day).
- * @param {number} [year] Année à prendre en compte pour le calcul.
- * @returns {Promise<object>} Réponse JSON de l’API contenant les émissions.
- * @throws {Error} En cas d’erreur HTTP ou de requête.
- */
+/** Calcule les émissions liées au stockage dans le cloud */
 export async function calculateStorageEmissions(
   provider,
   region,
   storageType,
   data,
   duration,
-  dataUnit = "MB",
-  durationUnit = "hour",
+  dataUnit = 'MB',
+  durationUnit = 'hour',
   year
 ) {
-  try {
-    const apiRegion = normalizeRegion(region);
-    const body = {
-      region: apiRegion,
-      storage_type: storageType,
-      data,
-      data_unit: dataUnit,
-      duration,
-      duration_unit: durationUnit,
-      ...(year !== undefined && { year }),
-    };
-    const response = await fetch(`${BASE_URL}/compute/v1/${provider}/storage`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
+  const apiRegion = normalizeRegion(region);
+  const url = `${BASE_URL}/compute/v1/${provider}/storage`;
+  const body = {
+    region: apiRegion,
+    storage_type: storageType,
+    data,
+    data_unit: dataUnit,
+    duration,
+    duration_unit: durationUnit,
+    ...(year !== undefined && { year }),
+  };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 }
 
-/**
- * Calcule les émissions carbone liées à l’utilisation de mémoire dans le cloud.
- *
- * @param {string} provider Nom du fournisseur (aws, gcp, azure, etc.).
- * @param {string} region Région cloud (ex. "ap-southeast-1").
- * @param {number} data Quantité de mémoire utilisée.
- * @param {number} duration Durée d’utilisation.
- * @param {string} [dataUnit="MB"] Unité des données (MB, GB).
- * @param {string} [durationUnit="hour"] Unité de durée (hour, day).
- * @param {number} [year] Année à prendre en compte pour le calcul.
- * @returns {Promise<object>} Réponse JSON de l’API contenant les émissions.
- * @throws {Error} En cas d’erreur HTTP ou de requête.
- */
+/** Calcule les émissions liées à la mémoire dans le cloud */
 export async function calculateMemoryEmissions(
   provider,
   region,
   data,
   duration,
-  dataUnit = "MB",
-  durationUnit = "hour",
+  dataUnit = 'MB',
+  durationUnit = 'hour',
   year
 ) {
-  try {
-    const apiRegion = normalizeRegion(region);
-    const body = {
-      region: apiRegion,
-      data,
-      data_unit: dataUnit,
-      duration,
-      duration_unit: durationUnit,
-      ...(year !== undefined && { year }),
-    };
-    const response = await fetch(`${BASE_URL}/compute/v1/${provider}/memory`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-
-    return await response.json();
-  } catch (error) {
-    throw error;
-  }
+  const apiRegion = normalizeRegion(region);
+  const url = `${BASE_URL}/compute/v1/${provider}/memory`;
+  const body = {
+    region: apiRegion,
+    data,
+    data_unit: dataUnit,
+    duration,
+    duration_unit: durationUnit,
+    ...(year !== undefined && { year }),
+  };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 }
 
+/** Recherche de facteurs d’émission */
 export async function searchEmissionFactors(query, filters = {}) {
-  try {
-    const params = new URLSearchParams();
-    params.append('query', query);
-    
-    if (filters.limit) {
-      params.append('results_per_page', filters.limit);
-      delete filters.limit;
-    }
-    
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null && value !== '') {
-        params.append(key, value);
-      }
-    });
-    
-    const response = await fetch(`${BASE_URL}/data/v1/search?${params.toString()}`, {
-      method: 'GET',
-      headers: { 
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Search emission factors error:', error);
-    throw error;
+  const params = new URLSearchParams({ query });
+  if (filters.limit) {
+    params.append('results_per_page', filters.limit);
+    delete filters.limit;
   }
+  Object.entries(filters).forEach(([k, v]) => {
+    if (v != null && v !== '') params.append(k, String(v));
+  });
+  const url = `${BASE_URL}/data/v1/search?${params.toString()}`;
+  return fetchWithError(url, {
+    method: 'GET',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
 }
 
+/** Récupère un facteur d’émission par ID */
 export async function getEmissionFactorById(id) {
-  try {
-    const response = await fetch(`${BASE_URL}/data/v1/emission-factors/${id}`, {
-      headers: { 
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-    });
-    
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error getting emission factor by ID:', error);
-    throw error;
-  }
+  const url = `${BASE_URL}/data/v1/emission-factors/${id}`;
+  return fetchWithError(url, {
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+  });
 }
 
-export async function calculateCustomEmissions(activityId, parameters, dataVersion = 'latest') {
-  try {
-    const body = {
-      emission_factor: { 
-        activity_id: activityId, 
-        data_version: dataVersion 
-      },
-      parameters
-    };
-    
-    console.log('Sending to Climatiq estimate API:', JSON.stringify(body, null, 2));
-    
-    const response = await fetch(`${BASE_URL}/data/v1/estimate`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body),
-    });
-    
-    if (!response.ok) {
-      const errBody = await response.text();
-      console.error('Climatiq API Error:', errBody);
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-    
-    const result = await response.json();
-    console.log('Climatiq API Response:', result);
-    return result;
-  } catch (error) {
-    console.error('Error in calculateCustomEmissions:', error);
-    throw error;
-  }
+/** Calcule des émissions custom via custom-mappings */
+export async function calculateCustomEmissions(
+  customLabel,
+  parameters,
+  options = {}
+) {
+  const {
+    dataVersion = '0.0',
+    source,
+    region,
+    regionFallback = false,
+    yearFallback = false,
+    year,
+    sourceLcaActivity,
+    calculationMethod,
+    allowedDataQualityFlags,
+  } = options;
+
+  const customMapping = { label: customLabel, data_version: dataVersion };
+  if (source) customMapping.source = source;
+  if (region) customMapping.region = region;
+  if (regionFallback) customMapping.region_fallback = regionFallback;
+  if (yearFallback) customMapping.year_fallback = yearFallback;
+  if (year) customMapping.year = year;
+  if (sourceLcaActivity) customMapping.source_lca_activity = sourceLcaActivity;
+  if (calculationMethod) customMapping.calculation_method = calculationMethod;
+  if (allowedDataQualityFlags)
+    customMapping.allowed_data_quality_flags = allowedDataQualityFlags;
+
+  const url = `${BASE_URL}/custom-mappings/v1/estimate`;
+  const body = { custom_mapping: customMapping, parameters };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
 }
 
-/**
- * Récupère les régions disponibles pour un fournisseur cloud donné.
- *
- * @param {string} provider Nom du fournisseur (aws, gcp, azure).
- * @returns {Promise<Array>} Liste des régions disponibles.
- * @throws {Error} En cas d'erreur HTTP ou de requête.
- */
+/** Crée des labels pour custom-mappings */
+export async function createCustomMappingLabels(labels, dataVersion = '0.0') {
+  const url = `${BASE_URL}/custom-mappings/v1/labels`;
+  const body = {
+    data_version: dataVersion,
+    labels: labels.map((l) => ({
+      label: typeof l === 'string' ? l : l.label,
+      ...(l.unit_type && { unit_type: l.unit_type }),
+      ...(l.source && { source: l.source }),
+      ...(l.allow_duplicates != null && { allow_duplicates: l.allow_duplicates }),
+    })),
+  };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Récupère les régions cloud, fallback statique en cas d’erreur */
 export async function getCloudRegions(provider) {
   try {
-    const response = await fetch(`${BASE_URL}/compute/v1/${provider}/regions`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${CLIMATIQ_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-    });
-
-    if (!response.ok) {
-      const errBody = await response.text();
-      throw new Error(`HTTP ${response.status} – ${errBody}`);
-    }
-
-    const data = await response.json();
+    const data = await fetchWithError(
+      `${BASE_URL}/compute/v1/${provider}/regions`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+      }
+    );
     return data.regions || [];
-  } catch (error) {
-    console.warn(`Impossible de récupérer les régions pour ${provider}:`, error);
+  } catch (err) {
+    console.warn(`Impossible de récupérer les régions pour ${provider}, fallback statique`, err);
     return getStaticRegions(provider);
   }
 }
 
-/**
- * Régions statiques de fallback si l'API ne répond pas.
- *
- * @param {string} provider Nom du fournisseur.
- * @returns {Array} Liste des régions par défaut.
- */
+/** Liste statique de régions si l’API échoue */
 function getStaticRegions(provider) {
   const staticRegions = {
     aws: [
@@ -364,7 +336,7 @@ function getStaticRegions(provider) {
       { id: 'eu-west-1', name: 'EU (Ireland)' },
       { id: 'eu-central-1', name: 'EU (Frankfurt)' },
       { id: 'ap-southeast-1', name: 'Asia Pacific (Singapore)' },
-      { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' }
+      { id: 'ap-northeast-1', name: 'Asia Pacific (Tokyo)' },
     ],
     gcp: [
       { id: 'us-central1', name: 'US Central (Iowa)' },
@@ -373,7 +345,7 @@ function getStaticRegions(provider) {
       { id: 'europe-west1', name: 'Europe West (Belgium)' },
       { id: 'europe-west4', name: 'Europe West (Netherlands)' },
       { id: 'asia-southeast1', name: 'Asia Southeast (Singapore)' },
-      { id: 'asia-east1', name: 'Asia East (Taiwan)' }
+      { id: 'asia-east1', name: 'Asia East (Taiwan)' },
     ],
     azure: [
       { id: 'eastus', name: 'East US (Virginia)' },
@@ -382,8 +354,8 @@ function getStaticRegions(provider) {
       { id: 'westeurope', name: 'West Europe (Netherlands)' },
       { id: 'northeurope', name: 'North Europe (Ireland)' },
       { id: 'southeastasia', name: 'Southeast Asia (Singapore)' },
-      { id: 'eastasia', name: 'East Asia (Hong Kong)' }
-    ]
+      { id: 'eastasia', name: 'East Asia (Hong Kong)' },
+    ],
   };
 
   return staticRegions[provider] || [];
