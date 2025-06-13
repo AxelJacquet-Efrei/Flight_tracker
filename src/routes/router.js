@@ -1,10 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from './lib/supabase'
-import Auth from './components/Auth.vue'
-import Home from './components/Home.vue'
-import AuthCallback from './components/AuthCallback.vue'
-import Calculator from './components/Calculator.vue'
-import Comparison from './components/Comparison.vue'
+import { supabase } from '../lib/supabase'
+import Auth from '../components/Auth.vue'
+import Home from '../components/Home.vue'
+import AuthCallback from '../components/AuthCallback.vue'
+import Calculator from '../components/Calculator.vue'
+import Comparison from '../components/Comparison.vue'
 
 const routes = [
   { path: '/', component: Home },
