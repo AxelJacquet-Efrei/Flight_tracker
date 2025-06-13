@@ -6,12 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "eslint --ext .js,.vue src",
+    "format": "prettier --write src/**/*.{js,vue,css,html}"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8",
     "chart.js": "^4.4.9",
     "dotenv": "^16.5.0",
+    "eslint": "^9.29.0",
+    "eslint-plugin-prettier": "^5.4.1",
+    "eslint-plugin-vue": "^10.2.0",
     "vue": "^3.3.4",
     "vue-router": "^4.2.4",
     "zod": "^3.25.30"
