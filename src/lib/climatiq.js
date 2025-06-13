@@ -502,3 +502,42 @@ export async function getCountryEmissionsStats(countries) {
   );
   return results;
 }
+
+/** Crée un mapping personnalisé */
+export async function createCustomMapping(mapping) {
+  const url = `${BASE_URL}/custom-mappings/v1/mappings`;
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(mapping),
+  });
+}
+
+/** Calcule les émissions liées à la consommation de carburant */
+export async function calculateFuelEmissions(
+  fuelType,
+  amount,
+  amountUnit = 'l',
+  region,
+  year
+) {
+  const url = `${BASE_URL}/energy/v1/fuel`;
+  const body = {
+    fuel_type: fuelType,
+    amount,
+    amount_unit: amountUnit,
+    ...(region && { region }),
+    ...(year && { year })
+  };
+  return fetchWithError(url, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${CLIMATIQ_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+}

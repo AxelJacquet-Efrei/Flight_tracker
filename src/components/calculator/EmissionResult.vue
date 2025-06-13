@@ -54,7 +54,37 @@
       <div class="space-y-2">
         <h3 class="font-medium text-green-800">Activity Details</h3>
         <div class="rounded-md bg-green-50 p-4 text-green-800">
-          <!-- details omitted for brevity -->
+          <template v-if="emission.activity_type === 'custom_activity'">
+            <div class="grid gap-2">
+              <div>
+                <span class="font-medium">Name:</span>
+                {{ emission.activity_data.name }}
+              </div>
+              <div>
+                <span class="font-medium">Value:</span>
+                {{ emission.activity_data.value }} {{ emission.activity_data.unit }}
+              </div>
+              <div>
+                <span class="font-medium">Emission Factor:</span>
+                {{ emission.activity_data.emission_factor.name }}
+              </div>
+              <div>
+                <span class="font-medium">Category:</span>
+                {{ emission.activity_data.emission_factor.category }}
+              </div>
+              <div v-if="emission.activity_data.emission_factor.region">
+                <span class="font-medium">Region:</span>
+                {{ emission.activity_data.emission_factor.region }}
+              </div>
+              <div v-if="emission.activity_data.emission_factor.source">
+                <span class="font-medium">Source:</span>
+                {{ emission.activity_data.emission_factor.source }}
+              </div>
+            </div>
+          </template>
+          <template v-else>
+            <!-- Existing details for other activity types -->
+          </template>
         </div>
       </div>
 
