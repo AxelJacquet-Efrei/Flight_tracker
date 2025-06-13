@@ -4,6 +4,7 @@ import Auth from './components/Auth.vue'
 import Home from './components/Home.vue'
 import AuthCallback from './components/AuthCallback.vue'
 import Calculator from './components/Calculator.vue'
+import Comparison from './components/Comparison.vue'
 
 const routes = [
   { path: '/', component: Home },
@@ -12,6 +13,11 @@ const routes = [
   { 
     path: '/calculator', 
     component: Calculator,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/comparisons',
+    component: Comparison,
     meta: { requiresAuth: true }
   },
 ]
